@@ -11,5 +11,5 @@ export const blueprintSchema = z.object({
 });
 export const evidenceSchema = z.object({ evidence: z.array(z.object({
   evidenceId: z.string(), type: z.enum(['whatsapp','image','cctv','document','witness_statement','report']), title: z.string(), description: z.string(),
-  content: z.record(z.unknown()).default({}), timestamp: z.string().optional(), relatedSuspectIds: z.array(z.string()).default([]), isCritical: z.boolean(), clueExplanation: z.string()
+  content: z.record(z.string(), z.unknown()).default({}), timestamp: z.string().optional(), relatedSuspectIds: z.array(z.string()).default([]), isCritical: z.boolean(), clueExplanation: z.string()
 })).min(5).max(14) });
