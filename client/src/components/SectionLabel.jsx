@@ -1,0 +1,1 @@
+export default function SectionLabel({ children, number }) { return <div className="section-label"><span className="section-dot" />{number && <span className="mono label-number">{number}</span>}{children}</div>; }
