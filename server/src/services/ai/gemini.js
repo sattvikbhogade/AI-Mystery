@@ -12,7 +12,7 @@ async function generateJson(prompt, schema, attempts = 2) {
   let issue = '';
   for (let i = 0; i < attempts; i += 1) {
     const response = await client().models.generateContent({
-      model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.0-flash',
+      model: process.env.GEMINI_TEXT_MODEL || 'gemini-3.8-flash',
       contents: `${prompt}\n\n${issue ? `Previous response had validation error: ${issue}. Return corrected JSON only.\n` : ''}Return only valid JSON.`,
       config: { responseMimeType: 'application/json', temperature: 0.75 }
     });

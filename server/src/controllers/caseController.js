@@ -27,7 +27,7 @@ export async function getOne(req,res,next) {
     const publicCase={...item};delete publicCase.privateSolution;delete publicCase.ownerId;delete publicCase.generationError;
     let verdict=null;
     if(accusation){const culprit=await Suspect.findOne({caseId:item._id,suspectId:item.privateSolution?.culpritSuspectId}).select('+isCulprit').lean();verdict={isCorrect:accusation.isCorrect,selectedSuspect:{suspectId:accusation.selectedSuspectId,name:suspects.find(s=>s.suspectId===accusation.selectedSuspectId)?.name},culprit:{suspectId:culprit?.suspectId,name:culprit?.name,occupation:culprit?.occupation},solution:item.privateSolution};}
-    res.json({success:true,message:'Case loaded',data:{case:publicCase,suspects,evidence,job:job?{status:job.status,currentStage:job.currentStage,progress:job.progress,error:job.error}:null,hasAccusation:Boolean(accusation),verdict}});
+    res.json({success:true,message:'Case loaded',data:{case:publicCase,suspects,evidence,job:job?{status:job.status,currentStage:job.currentStage,progress:job.progress,error:job.status==='failed'?'Case generation failed. Check the server configuration and logs, then start a new case.':null}:null,hasAccusation:Boolean(accusation),verdict}});
   }catch(error){next(error)}
 }
 export async function accuse(req,res,next){
