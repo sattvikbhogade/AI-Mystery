@@ -3,7 +3,7 @@ import Suspect from '../models/Suspect.js';
 import Evidence from '../models/Evidence.js';
 import GenerationJob from '../models/GenerationJob.js';
 import Accusation from '../models/Accusation.js';
-import { generateBlueprint, generateEvidence } from './ai/gemini.js';
+import { generateBlueprint, generateEvidence, GeminiRequestError } from './ai/gemini.js';
 
 const levels = { easy: 3, medium: 4, hard: 5 };
 const evidenceCounts = { easy: [5,7], medium: [8,10], hard: [11,14] };
@@ -16,7 +16,14 @@ export async function createCase({ ownerId, scenario, category, difficulty }) {
   const job = await GenerationJob.create({ caseId: item._id });
   runGeneration(item, job).catch(async error => {
     console.error('Case generation failed:', error.message);
-    await Promise.all([Case.updateOne({ _id: item._id }, { status: 'failed', generationStatus: 'failed', generationError: error.message }), GenerationJob.updateOne({ _id: job._id }, { status: 'failed', currentStage: 'failed', error: error.message })]);
+    const code = error.code || 'CASE_GENERATION_FAILED';
+    const message = error instanceof GeminiRequestError ? error.message : 'The generated case failed validation. Please try again.';
+    await Promise.all([
+      Suspect.deleteMany({ caseId: item._id }),
+      Evidence.deleteMany({ caseId: item._id }),
+      Case.updateOne({ _id: item._id }, { status: 'failed', generationStatus: 'failed', generationError: message }),
+      GenerationJob.updateOne({ _id: job._id }, { status: 'failed', currentStage: 'failed', error: message, errorCode: code })
+    ]);
   });
   return item;
 }
@@ -44,7 +51,7 @@ async function runGeneration(item, job) {
   await Suspect.insertMany(blueprint.suspects.map(({ isCulprit, ...s }) => ({ ...s, isCulprit, caseId: item._id })));
   await Evidence.insertMany(evidenceData.evidence.map(e => ({ ...e, caseId: item._id, timestamp: e.timestamp ? new Date(e.timestamp) : null })));
   item.status = 'ready'; item.generationStatus = 'completed'; await item.save();
-  job.status = 'completed'; await progress(job, 'completed', 100);
+  job.status = 'completed'; job.error = null; job.errorCode = null; await progress(job, 'completed', 100);
 }
 export async function getJob(caseId) { return GenerationJob.findOne({ caseId }).lean(); }
 export async function submitAccusation({ item, ownerId, selectedSuspectId, reasoning }) {
