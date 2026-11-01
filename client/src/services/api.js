@@ -1,6 +1,13 @@
 import axios from 'axios';
 
-const api = axios.create({ baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1', timeout: 30000 });
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
+  || (import.meta.env.DEV ? 'http://localhost:5000/api/v1' : '');
+
+if (!apiBaseUrl) {
+  throw new Error('VITE_API_BASE_URL must be set to the deployed API URL, including /api/v1.');
+}
+
+const api = axios.create({ baseURL: apiBaseUrl, timeout: 30000 });
 api.interceptors.request.use((config) => {
   config.headers['x-owner-id'] = localStorage.getItem('mystery-owner') || createOwnerId();
   return config;

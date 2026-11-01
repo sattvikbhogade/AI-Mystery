@@ -24,3 +24,5 @@ Case creation requires a working Gemini key and MongoDB connection. The server v
 - Public case endpoints explicitly project out the culprit and private clue annotations until verdict.
 
 See `spec.md` for the product and engineering baseline.
+
+See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the Vercel, Render, and MongoDB Atlas walkthrough.

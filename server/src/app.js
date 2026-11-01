@@ -5,7 +5,13 @@ import caseRoutes from './routes/caseRoutes.js';
 
 const app=express();
 app.disable('x-powered-by');
-app.use(cors({origin:process.env.CLIENT_URL||'http://localhost:5173'}));
+if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
+const allowedOrigins = (process.env.CLIENT_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5173'))
+  .split(',').map(origin => origin.trim()).filter(Boolean);
+app.use(cors({origin(origin, callback) {
+  if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+  return callback(new Error('Origin is not allowed by CORS.'));
+}}));
 app.use(express.json({limit:'20kb'}));
 app.use('/api/',rateLimit({windowMs:15*60*1000,limit:100,standardHeaders:'draft-7',legacyHeaders:false}));
 app.get('/api/health',(_req,res)=>res.json({success:true,message:'Mystery Room API is running',data:{status:'ok'}}));
