@@ -3,19 +3,46 @@ import { blueprintSchema, evidenceSchema } from '../../validators/case.js';
 
 function client() {
   if (!process.env.GEMINI_API_KEY) throw new Error('Case generation is not configured. Add GEMINI_API_KEY to the server environment.');
-  return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  return new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY,
+    httpOptions: { timeout: 90000, retryOptions: { attempts: 2 } }
+  });
+}
+function reportGeminiError(error, model) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const detail = String(error?.message || 'Unknown Gemini API error')
+    .replaceAll(apiKey || '\0', '[redacted]')
+    .slice(0, 1000);
+  const status = error?.status || (error?.code === 20 ? 'TIMEOUT' : error?.code) || (/gateway timeout/i.test(detail) ? 504 : 'unknown');
+  console.error('[Gemini] generateContent failed', { model, status, message: detail });
+
+  if (status === 404 || status === 'NOT_FOUND') {
+    throw new Error(`The configured Gemini model "${model}" is unavailable. Check GEMINI_TEXT_MODEL in server/.env.`);
+  }
+  if (status === 401 || status === 403 || status === 'UNAUTHENTICATED' || status === 'PERMISSION_DENIED') {
+    throw new Error('Gemini rejected this request. Check the API key and model access in Google AI Studio.');
+  }
+  throw new Error('Gemini could not generate this case. Check the server log and try again.');
 }
 function parseJson(text) {
   return JSON.parse(text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''));
 }
 async function generateJson(prompt, schema, attempts = 2) {
+  const model = process.env.GEMINI_TEXT_MODEL?.trim();
+  if (!model) throw new Error('GEMINI_TEXT_MODEL must be set in server/.env.');
+  const ai = client();
   let issue = '';
   for (let i = 0; i < attempts; i += 1) {
-    const response = await client().models.generateContent({
-      model: process.env.GEMINI_TEXT_MODEL || 'gemini-3.8-flash',
-      contents: `${prompt}\n\n${issue ? `Previous response had validation error: ${issue}. Return corrected JSON only.\n` : ''}Return only valid JSON.`,
-      config: { responseMimeType: 'application/json', temperature: 0.75 }
-    });
+    let response;
+    try {
+      response = await ai.models.generateContent({
+        model,
+        contents: `${prompt}\n\n${issue ? `Previous response had validation error: ${issue}. Return corrected JSON only.\n` : ''}Return only valid JSON.`,
+        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingLevel: 'low' } }
+      });
+    } catch (error) {
+      reportGeminiError(error, model);
+    }
     try { return schema.parse(parseJson(response.text || '')); }
     catch (error) { issue = error.issues ? error.issues.map(x => `${x.path.join('.')}: ${x.message}`).join('; ') : error.message; }
   }
